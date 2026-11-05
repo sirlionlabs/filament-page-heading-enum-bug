@@ -41,6 +41,8 @@ enum PostTypes: string implements HasLabel, Htmlable
      * -- Breadcrumbgs: System Update...this HTMLABLE Enum...
      * 
      * It is expected that page heading is the same as what's shown in the breadcrumb.
+     * Page heading is currently showing the enum value, not any label.
+     * It is expected that both areas should utilize the getLabel() instead of htmlable.
      * 
      */
 
