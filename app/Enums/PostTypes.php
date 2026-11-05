@@ -3,8 +3,9 @@
 namespace App\Enums;
 
 use Filament\Support\Contracts\HasLabel;
+use Illuminate\Contracts\Support\Htmlable;
 
-enum PostTypes: string implements HasLabel
+enum PostTypes: string implements HasLabel, Htmlable
 {
     case SYSTEM = 'system';
     case API = 'api';
@@ -28,6 +29,24 @@ enum PostTypes: string implements HasLabel
             self::SYSTEM => 'System Update',
             self::API => 'API Update',
         };
+    }
+
+    /**
+     * Adding in Htmlable contract resovles the above exception. However, the breadcrumbs 
+     * and the page Heading is not consistent. 
+     * 
+     * @see /admin/posts/1/edit
+     * 
+     * -- Page Heading: Edit system
+     * -- Breadcrumbgs: System Update...this HTMLABLE Enum...
+     * 
+     * It is expected that page heading is the same as what's shown in the breadcrumb.
+     * 
+     */
+
+    public function toHtml(): string
+    {
+        return $this->getLabel() .'...this HTMLABLE Enum...';
     }
 
 }
