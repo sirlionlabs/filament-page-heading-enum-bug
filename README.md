@@ -1,58 +1,120 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Install
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Clone the project and run migration. Three posts will seed with the migration.
+Git history shows the process of each step to recreate.
 
-## About Laravel
+## The Laravel setup:
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### App\Models\Post
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+```php
+class Post extends Model
+{
+    protected $fillable = [
+        'type', 'is_active',
+    ];
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+    protected function casts(): array
+    {
+        return [
+            'type' => PostTypes::class, // The `type` attribute is cast to `PostTypes` enum.
+            'is_active' => 'boolean', // This is nothing
+        ];
+    }
+}
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### App\Enums\PostTypes
 
-## Contributing
+See comments:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```php
 
-## Code of Conduct
+enum PostTypes: string implements HasLabel, Htmlable
+{
+    case SYSTEM = 'system';
+    case API = 'api';
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+    /**
+     * This enum is cast on the Post->type
+     * 
+     * @see /admin/posts/1/edit
+     * 
+     * TypeError
+     * vendor/filament/filament/src/Resources/Resource/Concerns/HasLabels.php:107
+     * 
+     * Filament\Resources\Resource::getRecordTitle(): 
+     * Return value must be of type Illuminate\Contracts\Support\Htmlable|string|null, 
+     * App\Enums\PostTypes returned
+     */
 
-## Security Vulnerabilities
+    public function getLabel(): ?string
+    {
+        return match ($this) {
+            self::SYSTEM => 'System Update',
+            self::API => 'API Update',
+        };
+    }
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+    /**
+     * Adding in Htmlable contract resovles the above exception. However, the breadcrumbs 
+     * and the page Heading is not consistent. 
+     * 
+     * @see /admin/posts/1/edit
+     * 
+     * -- Page Heading: Edit system
+     * -- Breadcrumbgs: System Update...this HTMLABLE Enum...
+     * 
+     * It is expected that page heading is the same as what's shown in the breadcrumb.
+     * Page heading is currently showing the enum value, not any label.
+     * It is expected that both areas should utilize the getLabel() instead of htmlable.
+     * 
+     */
 
-## License
+    public function toHtml(): string
+    {
+        return $this->getLabel() .'...this HTMLABLE Enum...';
+    }
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+}
+
+```
+
+## The Filament setup
+
+### App\Filament\Resources\Post\PostResource
+
+
+```php
+
+class PostResource extends Resource
+{
+    protected static ?string $model = Post::class;
+
+    protected static ?string $recordTitleAttribute = 'type'; // This is declared
+
+    //...
+
+```
+
+
+## The Issue
+
+Resource pages to view or modify the resource have the wrong, unexpected heading. 
+
+The Page heading reveals the enum value, whereas the breadcrumb is correctly showing the toHtml() value on the enum. The HasLabel contract with ->getLabel() causes an exception.
+
+![The bug](/the-bug.png)
+
+#### Breadcrumbs: Displays the enum->toHtml() value
+
+```
+    Posts > API Update...this HTMLABLE Enum... > Edit
+```
+
+#### Page Heading: Displays the enum->value
+
+```
+    Edit system
+```
+
